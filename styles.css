@@ -78,18 +78,14 @@ input[type="number"] {
 }
 
 .logout {
-  top: 10px;
-  right: 10px;
   background: crimson;
   color: white;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
+  border: 2px solid black;
+  padding: 8px 12px;
   font-size: 14px;
-  transition: background 0.3s ease;
+  z-index: 100;
 }
+
 
 .logout:hover {
   background: darkred;

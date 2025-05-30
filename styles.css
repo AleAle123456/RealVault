@@ -84,7 +84,15 @@ input[type="number"] {
   background: crimson;
   color: white;
   border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: bold;
   cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s ease;
 }
+
+.logout:hover {
+  background: darkred;
+}
+

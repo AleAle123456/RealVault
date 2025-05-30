@@ -1,82 +1,54 @@
-// ===== LOGIN LOGIC =====
-const PASSWORD = "231723"; // Change this to your secret password
-const loginScreen = document.getElementById("login-screen");
-const appScreen = document.getElementById("app");
-const loginInput = document.getElementById("password-input");
-const loginBtn = document.getElementById("login-button");
-const loginError = document.getElementById("login-error");
-
-// Auto login if previously authenticated
-if (localStorage.getItem("realvault-logged-in") === "true") {
-  loginScreen.style.display = "none";
-  appScreen.style.display = "block";
-}
-
-loginBtn?.addEventListener("click", () => {
-  if (loginInput.value === PASSWORD) {
-    localStorage.setItem("realvault-logged-in", "true");
-    loginScreen.style.display = "none";
-    appScreen.style.display = "block";
-  } else {
-    loginError.style.display = "block";
-  }
-});
-
-// ===== FIREBASE INIT =====
+// Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getDatabase,
+  ref,
+  set,
+  onValue,
+  push
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
+// Firebase config (replace with yours if needed)
 const firebaseConfig = {
-  apiKey: "AIzaSyA1lNI0aO5E0Usw-H5jWMljzVC9qvT3XSg",
-  authDomain: "physwallet-8f451.firebaseapp.com",
-  databaseURL: "https://physwallet-8f451-default-rtdb.firebaseio.com",
-  projectId: "physwallet-8f451",
-  storageBucket: "physwallet-8f451.appspot.com",
-  messagingSenderId: "473808876376",
-  appId: "1:473808876376:ios:6cd301420f57f3ccebab2d"
+  apiKey: "AIzaSyDnH-sDgfjj2BfwwMJ-RuEKKi6oMCnzXOE",
+  authDomain: "realvault.firebaseapp.com",
+  projectId: "realvault",
+  storageBucket: "realvault.appspot.com",
+  messagingSenderId: "642931443380",
+  appId: "1:642931443380:web:041abbc649d9613aee484e",
+  databaseURL: "https://realvault-default-rtdb.europe-west1.firebasedatabase.app/"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const balanceRef = ref(db, "balance");
 
-// ===== DOM Elements =====
+// References
+const balanceRef = ref(db, "balance");
+const transactionsRef = ref(db, "transactions");
+
+// DOM Elements
 const balanceDisplay = document.getElementById("balance");
 const amountInput = document.getElementById("amount");
-const addBtn = document.getElementById("add");
-const subtractBtn = document.getElementById("subtract");
+const addButton = document.getElementById("add");
+const subtractButton = document.getElementById("subtract");
+const historyDiv = document.getElementById("history");
 
-// ===== Balance Helpers =====
+// === Local Storage Sync ===
 function getLocalBalance() {
-  const val = localStorage.getItem("localBalance");
-  return val ? parseFloat(val) : 0;
+  return parseFloat(localStorage.getItem("balance") || "0");
 }
 
 function setLocalBalance(value) {
-  localStorage.setItem("localBalance", value);
-  showBalance(value);
+  localStorage.setItem("balance", value);
+  updateBalanceDisplay(value);
 }
 
-function showBalance(amount) {
-  balanceDisplay.textContent = `${amount.toFixed(2)} RON`;
+function updateBalanceDisplay(value) {
+  balanceDisplay.textContent = `${value.toFixed(2)} RON`;
 }
 
-// ===== Firebase Syncing =====
-function syncToFirebase() {
-  const localValue = getLocalBalance();
-  set(balanceRef, localValue)
-    .then(() => console.log("✔ Synced to Firebase:", localValue))
-    .catch((err) => console.error("Sync error:", err));
-}
-
-onValue(balanceRef, (snapshot) => {
-  const val = snapshot.val();
-  if (val !== null && navigator.onLine) {
-    setLocalBalance(val);
-  }
-});
-
-// ===== Update Logic =====
+// === Update Firebase + Add Transaction ===
 function updateBalance(multiplier) {
   const input = parseFloat(amountInput.value);
   if (isNaN(input) || input <= 0) return;
@@ -85,30 +57,61 @@ function updateBalance(multiplier) {
   const updated = current + multiplier * input;
 
   setLocalBalance(updated);
-  if (navigator.onLine) set(balanceRef, updated);
+
+  if (navigator.onLine) {
+    // Sync balance
+    set(balanceRef, updated);
+
+    // Log transaction
+    const transaction = {
+      amount: multiplier * input,
+      timestamp: Date.now(),
+      note: "" // Optional note support in future
+    };
+    push(transactionsRef, transaction);
+  }
 
   amountInput.value = "";
 }
 
-// ===== Event Listeners =====
-addBtn?.addEventListener("click", () => updateBalance(1));
-subtractBtn?.addEventListener("click", () => updateBalance(-1));
+// === Render History ===
+function renderHistory(data) {
+  historyDiv.innerHTML = ""; // Clear existing
+  const entries = Object.entries(data || {}).reverse(); // Newest first
 
-window.addEventListener("online", () => {
-  console.log("✅ Back online. Syncing...");
-  syncToFirebase();
-});
+  for (const [id, tx] of entries) {
+    const date = new Date(tx.timestamp).toLocaleString();
+    const sign = tx.amount >= 0 ? "+" : "−";
+    const color = tx.amount >= 0 ? "green" : "red";
+    const note = tx.note || "";
 
-// ===== First Load =====
-if (navigator.onLine) {
-  syncToFirebase();
-} else {
-  showBalance(getLocalBalance());
+    const item = document.createElement("div");
+    item.style.borderBottom = "1px solid #ccc";
+    item.style.padding = "6px 0";
+    item.innerHTML = `
+      <div><strong style="color:${color}">${sign}${Math.abs(tx.amount).toFixed(2)} RON</strong></div>
+      <small>${date}</small>${note ? `<br><em>${note}</em>` : ""}
+    `;
+    historyDiv.appendChild(item);
+  }
 }
 
-const logoutBtn = document.getElementById("logout-button");
-
-logoutBtn?.addEventListener("click", () => {
-  localStorage.removeItem("realvault-logged-in");
-  location.reload(); // Refresh the page to show login screen
+// === Realtime Firebase Listeners ===
+onValue(balanceRef, (snapshot) => {
+  const value = snapshot.val();
+  if (value !== null) {
+    setLocalBalance(value);
+  }
 });
+
+onValue(transactionsRef, (snapshot) => {
+  const data = snapshot.val();
+  renderHistory(data);
+});
+
+// === Event Listeners ===
+addButton.addEventListener("click", () => updateBalance(+1));
+subtractButton.addEventListener("click", () => updateBalance(-1));
+
+// === Initial Display ===
+updateBalanceDisplay(getLocalBalance());

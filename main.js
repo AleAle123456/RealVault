@@ -1,3 +1,28 @@
+// ===== LOGIN LOGIC =====
+const PASSWORD = "231723"; // Change this to your secret password
+const loginScreen = document.getElementById("login-screen");
+const appScreen = document.getElementById("app");
+const loginInput = document.getElementById("password-input");
+const loginBtn = document.getElementById("login-button");
+const loginError = document.getElementById("login-error");
+
+// Already logged in?
+if (localStorage.getItem("realvault-logged-in") === "true") {
+  loginScreen.style.display = "none";
+  appScreen.style.display = "block";
+}
+
+loginBtn.addEventListener("click", () => {
+  if (loginInput.value === PASSWORD) {
+    localStorage.setItem("realvault-logged-in", "true");
+    loginScreen.style.display = "none";
+    appScreen.style.display = "block";
+  } else {
+    loginError.style.display = "block";
+  }
+});
+
+
 // Import Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";

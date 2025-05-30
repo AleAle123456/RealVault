@@ -18,6 +18,54 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const balanceRef = ref(db, 'balance');
 
+// 1. Listen for online status
+window.addEventListener("online", syncLocalChanges);
+window.addEventListener("offline", () => {
+  console.log("You are now offline.");
+});
+
+// 2. Override updateBalance to store changes offline if needed
+function updateBalance(change) {
+  const amount = parseFloat(amountInput.value);
+  if (isNaN(amount) || amount <= 0) return;
+
+  if (!navigator.onLine) {
+    queueOfflineChange(change, amount);
+    alert("You're offline. Your change has been saved and will sync when you're back online.");
+  } else {
+    applyBalanceChange(change, amount);
+  }
+
+  amountInput.value = "";
+}
+
+// 3. Save unsynced changes locally
+function queueOfflineChange(change, amount) {
+  const changes = JSON.parse(localStorage.getItem("unsyncedChanges") || "[]");
+  changes.push({ change, amount });
+  localStorage.setItem("unsyncedChanges", JSON.stringify(changes));
+}
+
+// 4. Apply and sync them when online
+function syncLocalChanges() {
+  const changes = JSON.parse(localStorage.getItem("unsyncedChanges") || "[]");
+  if (changes.length === 0) return;
+
+  console.log("Syncing offline changes...");
+
+  onValue(balanceRef, (snapshot) => {
+    let current = snapshot.val() ?? 0;
+    for (const { change, amount } of changes) {
+      current += change * amount;
+    }
+    set(balanceRef, current).then(() => {
+      localStorage.removeItem("unsyncedChanges");
+      console.log("Offline changes synced successfully!");
+    });
+  }, { onlyOnce: true });
+}
+
+
 // UI Elements
 const balanceDisplay = document.getElementById("balance");
 const amountInput = document.getElementById("amount");

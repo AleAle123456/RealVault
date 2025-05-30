@@ -105,3 +105,10 @@ if (navigator.onLine) {
 } else {
   showBalance(getLocalBalance());
 }
+
+const logoutBtn = document.getElementById("logout-button");
+
+logoutBtn?.addEventListener("click", () => {
+  localStorage.removeItem("realvault-logged-in");
+  location.reload(); // Refresh the page to show login screen
+});

@@ -2,85 +2,90 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-// Firebase Config
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyA1lNI0aO5E0Usw-H5jWMljzVC9qvT3XSg",
   authDomain: "physwallet-8f451.firebaseapp.com",
-  databaseURL: "https://physwallet-8f451-default-rtdb.firebaseio.com",
+  databaseURL: "https://physwallet-8f451-default-rtdb.firebaseio.com", // ✅ Correct URL
   projectId: "physwallet-8f451",
   storageBucket: "physwallet-8f451.appspot.com",
   messagingSenderId: "473808876376",
   appId: "1:473808876376:ios:6cd301420f57f3ccebab2d"
 };
 
-// Init Firebase
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const balanceRef = ref(db, 'balance');
+const balanceRef = ref(db, "balance");
 
-// UI Elements
+// DOM Elements
 const balanceDisplay = document.getElementById("balance");
 const amountInput = document.getElementById("amount");
 const addBtn = document.getElementById("add");
 const subtractBtn = document.getElementById("subtract");
 
-// Update UI on balance change
+// Helper: Show balance in RON
+function showBalance(amount) {
+  balanceDisplay.textContent = `${amount.toFixed(2)} RON`;
+}
+
+// Local storage helpers
+function getLocalBalance() {
+  const value = localStorage.getItem("localBalance");
+  return value ? parseFloat(value) : 0;
+}
+
+function setLocalBalance(value) {
+  localStorage.setItem("localBalance", value);
+  showBalance(value);
+}
+
+// Sync local balance to Firebase when online
+function syncToFirebase() {
+  const localValue = getLocalBalance();
+  set(balanceRef, localValue);
+  console.log("✔ Synced local balance to Firebase:", localValue);
+}
+
+// Real-time Firebase listener
 onValue(balanceRef, (snapshot) => {
-  const value = snapshot.val();
-  balanceDisplay.textContent = `${(value ?? 0).toFixed(2)} RON`;
+  const val = snapshot.val();
+  if (val !== null) {
+    setLocalBalance(val); // Update local as well
+  }
 });
 
-// Button Handlers
-addBtn.addEventListener("click", () => updateBalance(1));
-subtractBtn.addEventListener("click", () => updateBalance(-1));
-
-// Update or Queue Balance
+// Update balance (works offline or online)
 function updateBalance(change) {
-  const amount = parseFloat(amountInput.value);
-  if (isNaN(amount) || amount <= 0) return;
+  const inputAmount = parseFloat(amountInput.value);
+  if (isNaN(inputAmount) || inputAmount <= 0) return;
 
+  const current = getLocalBalance();
+  const updated = current + change * inputAmount;
+
+  setLocalBalance(updated);
   if (navigator.onLine) {
-    applyBalanceChange(change, amount);
-  } else {
-    queueOfflineChange(change, amount);
-    alert("You're offline. Change saved and will sync later.");
+    set(balanceRef, updated);
   }
 
   amountInput.value = "";
 }
 
-// Apply to Firebase
-function applyBalanceChange(change, amount) {
-  onValue(balanceRef, (snapshot) => {
-    const current = snapshot.val() ?? 0;
-    const newBalance = current + change * amount;
-    set(balanceRef, newBalance);
-  }, { onlyOnce: true });
+// Event listeners
+addBtn.addEventListener("click", () => updateBalance(1));
+subtractBtn.addEventListener("click", () => updateBalance(-1));
+
+// Initial balance display
+if (!navigator.onLine) {
+  setLocalBalance(getLocalBalance());
 }
 
-// Save locally while offline
-function queueOfflineChange(change, amount) {
-  const queue = JSON.parse(localStorage.getItem("unsyncedChanges") || "[]");
-  queue.push({ change, amount });
-  localStorage.setItem("unsyncedChanges", JSON.stringify(queue));
+// Sync once back online
+window.addEventListener("online", () => {
+  syncToFirebase();
+});
+
+// Optional: Sync on page load if online
+if (navigator.onLine) {
+  syncToFirebase();
 }
-
-// Sync changes when online
-function syncOfflineChanges() {
-  const changes = JSON.parse(localStorage.getItem("unsyncedChanges") || "[]");
-  if (changes.length === 0) return;
-
-  onValue(balanceRef, (snapshot) => {
-    let current = snapshot.val() ?? 0;
-    for (const { change, amount } of changes) {
-      current += change * amount;
-    }
-    set(balanceRef, current).then(() => {
-      localStorage.removeItem("unsyncedChanges");
-      console.log("Offline changes synced.");
-    });
-  }, { onlyOnce: true });
-}
-
-// Listen for online status
-window.addEventListener("online", syncOfflineChanges);

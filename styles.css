@@ -65,3 +65,12 @@ input[type="number"] {
 .buttons button:hover {
   opacity: 0.9;
 }
+
+#login-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 300px;
+  margin: 100px auto;
+  text-align: center;
+}

@@ -85,3 +85,10 @@ function updateBalance(change) {
 // Button events
 addBtn.addEventListener("click", () => updateBalance(1));
 subtractBtn.addEventListener("click", () => updateBalance(-1));
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js')
+    .then(() => console.log("✅ Service Worker Registered"))
+    .catch(err => console.error("Service Worker Failed:", err));
+}
+

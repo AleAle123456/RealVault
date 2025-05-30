@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-// Your Firebase config
+// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyA1lNI0aO5E0Usw-H5jWMljzVC9qvT3XSg",
   authDomain: "physwallet-8f451.firebaseapp.com",
@@ -18,40 +18,57 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const balanceRef = ref(db, 'balance');
 
-// 1. Listen for online status
-window.addEventListener("online", syncLocalChanges);
-window.addEventListener("offline", () => {
-  console.log("You are now offline.");
+// UI Elements
+const balanceDisplay = document.getElementById("balance");
+const amountInput = document.getElementById("amount");
+const addBtn = document.getElementById("add");
+const subtractBtn = document.getElementById("subtract");
+
+// Update UI on balance change
+onValue(balanceRef, (snapshot) => {
+  const value = snapshot.val();
+  balanceDisplay.textContent = `${(value ?? 0).toFixed(2)} RON`;
 });
 
-// 2. Override updateBalance to store changes offline if needed
+// Button Handlers
+addBtn.addEventListener("click", () => updateBalance(1));
+subtractBtn.addEventListener("click", () => updateBalance(-1));
+
+// Update or Queue Balance
 function updateBalance(change) {
   const amount = parseFloat(amountInput.value);
   if (isNaN(amount) || amount <= 0) return;
 
-  if (!navigator.onLine) {
-    queueOfflineChange(change, amount);
-    alert("You're offline. Your change has been saved and will sync when you're back online.");
-  } else {
+  if (navigator.onLine) {
     applyBalanceChange(change, amount);
+  } else {
+    queueOfflineChange(change, amount);
+    alert("You're offline. Change saved and will sync later.");
   }
 
   amountInput.value = "";
 }
 
-// 3. Save unsynced changes locally
-function queueOfflineChange(change, amount) {
-  const changes = JSON.parse(localStorage.getItem("unsyncedChanges") || "[]");
-  changes.push({ change, amount });
-  localStorage.setItem("unsyncedChanges", JSON.stringify(changes));
+// Apply to Firebase
+function applyBalanceChange(change, amount) {
+  onValue(balanceRef, (snapshot) => {
+    const current = snapshot.val() ?? 0;
+    const newBalance = current + change * amount;
+    set(balanceRef, newBalance);
+  }, { onlyOnce: true });
 }
 
-// 4. Apply and sync them when online
-function syncLocalChanges() {
+// Save locally while offline
+function queueOfflineChange(change, amount) {
+  const queue = JSON.parse(localStorage.getItem("unsyncedChanges") || "[]");
+  queue.push({ change, amount });
+  localStorage.setItem("unsyncedChanges", JSON.stringify(queue));
+}
+
+// Sync changes when online
+function syncOfflineChanges() {
   const changes = JSON.parse(localStorage.getItem("unsyncedChanges") || "[]");
   if (changes.length === 0) return;
-
-  console.log("Syncing offline changes...");
 
   onValue(balanceRef, (snapshot) => {
     let current = snapshot.val() ?? 0;
@@ -60,57 +77,10 @@ function syncLocalChanges() {
     }
     set(balanceRef, current).then(() => {
       localStorage.removeItem("unsyncedChanges");
-      console.log("Offline changes synced successfully!");
+      console.log("Offline changes synced.");
     });
   }, { onlyOnce: true });
 }
 
-
-// UI Elements
-const balanceDisplay = document.getElementById("balance");
-const amountInput = document.getElementById("amount");
-const addBtn = document.getElementById("add");
-const subtractBtn = document.getElementById("subtract");
-
-// Local fallback
-let localBalance = parseFloat(localStorage.getItem("balance")) || 0;
-balanceDisplay.textContent = `${localBalance.toFixed(2)} RON`;
-
-// Firebase updates
-onValue(balanceRef, (snapshot) => {
-  const value = snapshot.val();
-  if (value != null) {
-    localBalance = value;
-    localStorage.setItem("balance", value);
-    balanceDisplay.textContent = `${value.toFixed(2)} RON`;
-  }
-});
-
-// Update balance
-function updateBalance(change) {
-  const amount = parseFloat(amountInput.value);
-  if (isNaN(amount) || amount <= 0) return;
-
-  const newBalance = localBalance + change * amount;
-  localBalance = newBalance;
-  localStorage.setItem("balance", newBalance);
-  balanceDisplay.textContent = `${newBalance.toFixed(2)} RON`;
-
-  // Update Firebase (fails silently if offline)
-  set(balanceRef, newBalance).catch(() => {
-    console.warn("Offline: Firebase update failed, saved locally.");
-  });
-
-  amountInput.value = "";
-}
-
-// Button actions
-addBtn.addEventListener("click", () => updateBalance(1));
-subtractBtn.addEventListener("click", () => updateBalance(-1));
-
-// Optional: Register service worker for PWA
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js')
-    .then(() => console.log("✅ Service Worker Registered"))
-    .catch(err => console.error("Service Worker Failed:", err));
-}
+// Listen for online status
+window.addEventListener("online", syncOfflineChanges);

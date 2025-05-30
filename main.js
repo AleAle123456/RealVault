@@ -6,13 +6,13 @@ const loginInput = document.getElementById("password-input");
 const loginBtn = document.getElementById("login-button");
 const loginError = document.getElementById("login-error");
 
-// Already logged in?
+// Auto login if previously authenticated
 if (localStorage.getItem("realvault-logged-in") === "true") {
   loginScreen.style.display = "none";
   appScreen.style.display = "block";
 }
 
-loginBtn.addEventListener("click", () => {
+loginBtn?.addEventListener("click", () => {
   if (loginInput.value === PASSWORD) {
     localStorage.setItem("realvault-logged-in", "true");
     loginScreen.style.display = "none";
@@ -22,42 +22,34 @@ loginBtn.addEventListener("click", () => {
   }
 });
 
-
-// Import Firebase
+// ===== FIREBASE INIT =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyA1lNI0aO5E0Usw-H5jWMljzVC9qvT3XSg",
   authDomain: "physwallet-8f451.firebaseapp.com",
-  databaseURL: "https://physwallet-8f451-default-rtdb.firebaseio.com", // ✅ Correct URL
+  databaseURL: "https://physwallet-8f451-default-rtdb.firebaseio.com",
   projectId: "physwallet-8f451",
   storageBucket: "physwallet-8f451.appspot.com",
   messagingSenderId: "473808876376",
   appId: "1:473808876376:ios:6cd301420f57f3ccebab2d"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const balanceRef = ref(db, "balance");
 
-// DOM Elements
+// ===== DOM Elements =====
 const balanceDisplay = document.getElementById("balance");
 const amountInput = document.getElementById("amount");
 const addBtn = document.getElementById("add");
 const subtractBtn = document.getElementById("subtract");
 
-// Helper: Show balance in RON
-function showBalance(amount) {
-  balanceDisplay.textContent = `${amount.toFixed(2)} RON`;
-}
-
-// Local storage helpers
+// ===== Balance Helpers =====
 function getLocalBalance() {
-  const value = localStorage.getItem("localBalance");
-  return value ? parseFloat(value) : 0;
+  const val = localStorage.getItem("localBalance");
+  return val ? parseFloat(val) : 0;
 }
 
 function setLocalBalance(value) {
@@ -65,52 +57,51 @@ function setLocalBalance(value) {
   showBalance(value);
 }
 
-// Sync local balance to Firebase when online
-function syncToFirebase() {
-  const localValue = getLocalBalance();
-  set(balanceRef, localValue);
-  console.log("✔ Synced local balance to Firebase:", localValue);
+function showBalance(amount) {
+  balanceDisplay.textContent = `${amount.toFixed(2)} RON`;
 }
 
-// Real-time Firebase listener
+// ===== Firebase Syncing =====
+function syncToFirebase() {
+  const localValue = getLocalBalance();
+  set(balanceRef, localValue)
+    .then(() => console.log("✔ Synced to Firebase:", localValue))
+    .catch((err) => console.error("Sync error:", err));
+}
+
 onValue(balanceRef, (snapshot) => {
   const val = snapshot.val();
-  if (val !== null) {
-    setLocalBalance(val); // Update local as well
+  if (val !== null && navigator.onLine) {
+    setLocalBalance(val);
   }
 });
 
-// Update balance (works offline or online)
-function updateBalance(change) {
-  const inputAmount = parseFloat(amountInput.value);
-  if (isNaN(inputAmount) || inputAmount <= 0) return;
+// ===== Update Logic =====
+function updateBalance(multiplier) {
+  const input = parseFloat(amountInput.value);
+  if (isNaN(input) || input <= 0) return;
 
   const current = getLocalBalance();
-  const updated = current + change * inputAmount;
+  const updated = current + multiplier * input;
 
   setLocalBalance(updated);
-  if (navigator.onLine) {
-    set(balanceRef, updated);
-  }
+  if (navigator.onLine) set(balanceRef, updated);
 
   amountInput.value = "";
 }
 
-// Event listeners
-addBtn.addEventListener("click", () => updateBalance(1));
-subtractBtn.addEventListener("click", () => updateBalance(-1));
+// ===== Event Listeners =====
+addBtn?.addEventListener("click", () => updateBalance(1));
+subtractBtn?.addEventListener("click", () => updateBalance(-1));
 
-// Initial balance display
-if (!navigator.onLine) {
-  setLocalBalance(getLocalBalance());
-}
-
-// Sync once back online
 window.addEventListener("online", () => {
+  console.log("✅ Back online. Syncing...");
   syncToFirebase();
 });
 
-// Optional: Sync on page load if online
+// ===== First Load =====
 if (navigator.onLine) {
   syncToFirebase();
+} else {
+  showBalance(getLocalBalance());
 }

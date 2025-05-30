@@ -26,19 +26,50 @@ const addBtn = document.getElementById("add");
 const subtractBtn = document.getElementById("subtract");
 
 // Update UI when Firebase data changes
+// Show balance from localStorage immediately
+let localBalance = parseFloat(localStorage.getItem("balance")) || 0;
+balanceDisplay.textContent = `${localBalance.toFixed(2)} RON`;
+
+// Firebase updates
 onValue(balanceRef, (snapshot) => {
-  const value = snapshot.val() ?? 0;
-  balanceDisplay.textContent = value.toFixed(2) + " RON";
+  const value = snapshot.val();
+  if (value != null) {
+    localStorage.setItem("balance", value);
+    balanceDisplay.textContent = `${value.toFixed(2)} RON`;
+  }
 });
 
-// Async update balance helper
-async function updateBalance(change) {
-  const amount = parseFloat(amountInput.value);
-  if (isNaN(amount) || amount <= 0) {
-    alert("Please enter a valid positive number");
-    return;
+// Show balance from localStorage immediately
+let localBalance = parseFloat(localStorage.getItem("balance")) || 0;
+balanceDisplay.textContent = `${localBalance.toFixed(2)} RON`;
+
+// Firebase updates
+onValue(balanceRef, (snapshot) => {
+  const value = snapshot.val();
+  if (value != null) {
+    localStorage.setItem("balance", value);
+    balanceDisplay.textContent = `${value.toFixed(2)} RON`;
   }
-  
+});
+
+// Update balance function
+function updateBalance(change) {
+  const amount = parseFloat(amountInput.value);
+  if (isNaN(amount) || amount <= 0) return;
+
+  let newBalance = localBalance + change * amount;
+  localBalance = newBalance;
+  localStorage.setItem("balance", newBalance);
+  balanceDisplay.textContent = `${newBalance.toFixed(2)} RON`;
+
+  // Try to update Firebase (will fail silently if offline)
+  set(balanceRef, newBalance).catch(() => {
+    console.warn("Offline: Firebase update failed, saved locally.");
+  });
+
+  amountInput.value = "";
+}
+
   try {
     const snapshot = await get(balanceRef);
     const current = snapshot.val() ?? 0;

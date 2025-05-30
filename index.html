@@ -9,6 +9,24 @@
   <link rel="stylesheet" href="styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
+  
+  <body>
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen">
+    <h2>Enter Password</h2>
+    <input type="password" id="password-input" placeholder="Password" />
+    <button id="login-button">Login</button>
+    <p id="login-error" style="color: red; display: none;">Wrong password</p>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app" style="display: none;">
+    <!-- Your existing RealVault UI here -->
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+
 <body>
   <div class="container">
     <h1>💸 RealVault</h1>
